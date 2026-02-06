@@ -10,7 +10,7 @@
     grid-template-columns: repeat(9, 1fr);
     gap: 8px;
     max-width: 900px;
-    margin: 20px auto;
+    margin: 80px auto 20px auto;
     perspective: 1000px;
   }
   .card {
@@ -21,6 +21,7 @@
     position: relative;
     transform-style: preserve-3d;
     transition: transform 0.6s;
+    will-change: transform;
   }
   .card.open {
     transform: rotateY(180deg);
@@ -58,7 +59,9 @@
     min-width: 150px;
   }
   #currentTurn {
-    margin-top: 15px;
+    position: fixed;
+    top: 20px;
+    right: 10px;
     font-weight: bold;
     font-size: 18px;
   }
@@ -69,7 +72,7 @@
 <div id="players"></div>
 <div id="currentTurn"></div>
 
-<h2 style="text-align:center; margin-top:60px;">Batak Hafıza Oyunu</h2>
+<h2 style="text-align:center; margin-top:20px;">Batak Hafıza Oyunu</h2>
 <div id="board"></div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -84,52 +87,39 @@
   const currentTurnDiv = document.getElementById("currentTurn");
 
   socket.on("state", game => {
-    // Oyuncuları göster (sol kenar)
+
+    // Oyuncuları göster
     playersDiv.innerHTML = "<h3>Oyuncular</h3>";
     game.players.forEach((p, i) => {
       const score = game.scores[p.id] || 0;
       const isTurn = game.turn === i;
       const span = document.createElement("div");
       span.textContent = `${p.name}: ${score}`;
-      if (isTurn) {
-        span.style.fontWeight = "bold";
-        span.style.color = "#ff0";
-      }
+      if (isTurn) { span.style.fontWeight = "bold"; span.style.color = "#ff0"; }
       playersDiv.appendChild(span);
     });
 
-    // Kimde sıra göster
-    if (game.players.length > 0) {
-      currentTurnDiv.textContent = `Sıra: ${game.players[game.turn].name}`;
-    } else {
-      currentTurnDiv.textContent = "";
-    }
+    // Kimde sıra
+    currentTurnDiv.textContent = game.players.length > 0 ? `Sıra: ${game.players[game.turn].name}` : "";
 
     // Kartları göster
     board.innerHTML = "";
+    board.style.pointerEvents = "none"; // DOM güncellenirken tıklamayı kapat
     game.deck.forEach((card, i) => {
       const cardDiv = document.createElement("div");
       cardDiv.className = "card";
-
-      // Kart açılmış mı?
       const isOpen = game.open.includes(i);
       const isMatched = game.matched.includes(i);
 
-      if (isOpen || isMatched) {
-        cardDiv.classList.add("open");
-      }
-      if (isMatched) {
-        cardDiv.classList.add("matched");
-      }
+      if (isOpen || isMatched) cardDiv.classList.add("open");
+      if (isMatched) cardDiv.classList.add("matched");
 
-      // Kartın ön yüzü
       const front = document.createElement("div");
       front.className = "card-face card-front";
       const imgFront = document.createElement("img");
       imgFront.src = card.img;
       front.appendChild(imgFront);
 
-      // Kartın arka yüzü
       const back = document.createElement("div");
       back.className = "card-face card-back";
       const imgBack = document.createElement("img");
@@ -139,12 +129,10 @@
       cardDiv.appendChild(front);
       cardDiv.appendChild(back);
 
-      // Sadece sıra kimdeyse o oynayabilir, diğerleri tıklamasın
+      // Sadece sıra kimdeyse tıklanabilir
       if (!isMatched && game.players[game.turn].id === socket.id && !isOpen) {
         cardDiv.style.cursor = "pointer";
-        cardDiv.onclick = () => {
-          socket.emit("cardClick", { room, index: i });
-        };
+        cardDiv.onclick = () => socket.emit("cardClick", { room, index: i });
       } else {
         cardDiv.style.cursor = "default";
         cardDiv.onclick = null;
@@ -152,6 +140,8 @@
 
       board.appendChild(cardDiv);
     });
+
+    setTimeout(() => { board.style.pointerEvents = "auto"; }, 700);
   });
 </script>
 
