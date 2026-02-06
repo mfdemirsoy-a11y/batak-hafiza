@@ -1,40 +1,158 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 <title>Batak Hafıza</title>
 <style>
-body { background:#0b3d2e; color:white; text-align:center; font-family:Arial }
-#board { display:grid; grid-template-columns:repeat(9,1fr); gap:6px; max-width:900px; margin:auto }
-.card { cursor:pointer }
-img { width:100% }
+  body { background:#0b3d2e; color:white; font-family: Arial, sans-serif; margin:0; padding:0; }
+  #board {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 8px;
+    max-width: 900px;
+    margin: 20px auto;
+    perspective: 1000px;
+  }
+  .card {
+    width: 90px;
+    height: 120px;
+    border-radius: 6px;
+    cursor: pointer;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.6s;
+  }
+  .card.open {
+    transform: rotateY(180deg);
+    cursor: default;
+  }
+  .card.matched {
+    visibility: hidden;
+  }
+  .card-face {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 6px;
+    backface-visibility: hidden;
+  }
+  .card-front {
+    transform: rotateY(180deg);
+  }
+  .card-front img,
+  .card-back img {
+    width: 100%;
+    height: 100%;
+    border-radius: 6px;
+  }
+  .card-back {
+    background-color: #1e6f5c;
+  }
+  #players {
+    position: fixed;
+    top: 20px;
+    left: 10px;
+    background: rgba(0,0,0,0.6);
+    padding: 10px;
+    border-radius: 8px;
+    min-width: 150px;
+  }
+  #currentTurn {
+    margin-top: 15px;
+    font-weight: bold;
+    font-size: 18px;
+  }
 </style>
 </head>
 <body>
 
-<h2>Batak Hafıza Oyunu</h2>
+<div id="players"></div>
+<div id="currentTurn"></div>
+
+<h2 style="text-align:center; margin-top:60px;">Batak Hafıza Oyunu</h2>
 <div id="board"></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io();
-const room = new URLSearchParams(location.search).get("room") || "masa1";
-const name = prompt("İsminizi girin");
-socket.emit("joinRoom", { room, name });
+  const socket = io();
+  const room = new URLSearchParams(location.search).get("room") || "masa1";
+  const name = prompt("İsminizi girin");
+  socket.emit("joinRoom", { room, name });
 
-socket.on("state", game => {
   const board = document.getElementById("board");
-  board.innerHTML = "";
-  game.deck.forEach((c,i)=>{
-    const d=document.createElement("div");
-    d.className="card";
-    const img=document.createElement("img");
-    img.src=c.img;
-    d.onclick=()=>socket.emit("cardClick",{room,index:i});
-    d.appendChild(img);
-    board.appendChild(d);
+  const playersDiv = document.getElementById("players");
+  const currentTurnDiv = document.getElementById("currentTurn");
+
+  socket.on("state", game => {
+    // Oyuncuları göster (sol kenar)
+    playersDiv.innerHTML = "<h3>Oyuncular</h3>";
+    game.players.forEach((p, i) => {
+      const score = game.scores[p.id] || 0;
+      const isTurn = game.turn === i;
+      const span = document.createElement("div");
+      span.textContent = `${p.name}: ${score}`;
+      if (isTurn) {
+        span.style.fontWeight = "bold";
+        span.style.color = "#ff0";
+      }
+      playersDiv.appendChild(span);
+    });
+
+    // Kimde sıra göster
+    if (game.players.length > 0) {
+      currentTurnDiv.textContent = `Sıra: ${game.players[game.turn].name}`;
+    } else {
+      currentTurnDiv.textContent = "";
+    }
+
+    // Kartları göster
+    board.innerHTML = "";
+    game.deck.forEach((card, i) => {
+      const cardDiv = document.createElement("div");
+      cardDiv.className = "card";
+
+      // Kart açılmış mı?
+      const isOpen = game.open.includes(i);
+      const isMatched = game.matched.includes(i);
+
+      if (isOpen || isMatched) {
+        cardDiv.classList.add("open");
+      }
+      if (isMatched) {
+        cardDiv.classList.add("matched");
+      }
+
+      // Kartın ön yüzü
+      const front = document.createElement("div");
+      front.className = "card-face card-front";
+      const imgFront = document.createElement("img");
+      imgFront.src = card.img;
+      front.appendChild(imgFront);
+
+      // Kartın arka yüzü
+      const back = document.createElement("div");
+      back.className = "card-face card-back";
+      const imgBack = document.createElement("img");
+      imgBack.src = "https://deckofcardsapi.com/static/img/back.png";
+      back.appendChild(imgBack);
+
+      cardDiv.appendChild(front);
+      cardDiv.appendChild(back);
+
+      // Sadece sıra kimdeyse o oynayabilir, diğerleri tıklamasın
+      if (!isMatched && game.players[game.turn].id === socket.id && !isOpen) {
+        cardDiv.style.cursor = "pointer";
+        cardDiv.onclick = () => {
+          socket.emit("cardClick", { room, index: i });
+        };
+      } else {
+        cardDiv.style.cursor = "default";
+        cardDiv.onclick = null;
+      }
+
+      board.appendChild(cardDiv);
+    });
   });
-});
 </script>
 
 </body>
