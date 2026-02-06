@@ -11,44 +11,44 @@
     gap: 8px;
     max-width: 900px;
     margin: 80px auto 20px auto;
-    perspective: 1000px;
+    perspective: 1200px;
   }
+
   .card {
     width: 90px;
     height: 120px;
     border-radius: 6px;
-    cursor: pointer;
     position: relative;
     transform-style: preserve-3d;
     transition: transform 0.6s;
     will-change: transform;
   }
-  .card.open {
-    transform: rotateY(180deg);
-    cursor: default;
-  }
-  .card.matched {
-    visibility: hidden;
-  }
+
+  .card.open { transform: rotateY(180deg); cursor: default; }
+  .card.matched { visibility: hidden; }
+
   .card-face {
     position: absolute;
     width: 100%;
     height: 100%;
     border-radius: 6px;
     backface-visibility: hidden;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
   }
+
   .card-front {
     transform: rotateY(180deg);
   }
-  .card-front img,
-  .card-back img {
+
+  .card-front img, .card-back img {
     width: 100%;
     height: 100%;
     border-radius: 6px;
+    display:block;
   }
-  .card-back {
-    background-color: #1e6f5c;
-  }
+
+  .card-back { background-color: #1e6f5c; }
+
   #players {
     position: fixed;
     top: 20px;
@@ -58,6 +58,7 @@
     border-radius: 8px;
     min-width: 150px;
   }
+
   #currentTurn {
     position: fixed;
     top: 20px;
@@ -99,12 +100,11 @@
       playersDiv.appendChild(span);
     });
 
-    // Kimde sıra
     currentTurnDiv.textContent = game.players.length > 0 ? `Sıra: ${game.players[game.turn].name}` : "";
 
-    // Kartları göster
+    // Kartları oluştur
     board.innerHTML = "";
-    board.style.pointerEvents = "none"; // DOM güncellenirken tıklamayı kapat
+    board.style.pointerEvents = "none";
     game.deck.forEach((card, i) => {
       const cardDiv = document.createElement("div");
       cardDiv.className = "card";
