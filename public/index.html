@@ -2,147 +2,99 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8" />
-<title>Batak Hafıza</title>
+<title>Batak Hafıza Masa</title>
 <style>
-  body { background:#0b3d2e; color:white; font-family: Arial, sans-serif; margin:0; padding:0; }
-  #board {
-    display: grid;
-    grid-template-columns: repeat(9, 1fr);
-    gap: 8px;
-    max-width: 900px;
-    margin: 80px auto 20px auto;
-    perspective: 1200px;
-  }
+body { background:#0b3d2e; color:white; font-family: Arial, sans-serif; margin:0; padding:0; }
+#board { display: grid; grid-template-columns: repeat(9, 1fr); gap: 8px; max-width: 900px; margin: 120px auto 20px auto; perspective:1200px; }
+.card { width:90px; height:120px; border-radius:6px; position:relative; transform-style: preserve-3d; transition: transform 0.6s; will-change: transform; }
+.card.open { transform:rotateY(180deg); cursor:default; }
+.card.matched { visibility:hidden; }
+.card-face { position:absolute; width:100%; height:100%; border-radius:6px; backface-visibility:hidden; box-shadow:0 2px 6px rgba(0,0,0,0.5); }
+.card-front { transform:rotateY(180deg); }
+.card-front img, .card-back img { width:100%; height:100%; display:block; border-radius:6px; }
+.card-back { background:#1e6f5c; }
 
-  .card {
-    width: 90px;
-    height: 120px;
-    border-radius: 6px;
-    position: relative;
-    transform-style: preserve-3d;
-    transition: transform 0.6s;
-    will-change: transform;
-  }
-
-  .card.open { transform: rotateY(180deg); cursor: default; }
-  .card.matched { visibility: hidden; }
-
-  .card-face {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    border-radius: 6px;
-    backface-visibility: hidden;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
-  }
-
-  .card-front {
-    transform: rotateY(180deg);
-  }
-
-  .card-front img, .card-back img {
-    width: 100%;
-    height: 100%;
-    border-radius: 6px;
-    display:block;
-  }
-
-  .card-back { background-color: #1e6f5c; }
-
-  #players {
-    position: fixed;
-    top: 20px;
-    left: 10px;
-    background: rgba(0,0,0,0.6);
-    padding: 10px;
-    border-radius: 8px;
-    min-width: 150px;
-  }
-
-  #currentTurn {
-    position: fixed;
-    top: 20px;
-    right: 10px;
-    font-weight: bold;
-    font-size: 18px;
-  }
+#players { position:fixed; top:20px; left:10px; background:rgba(0,0,0,0.6); padding:10px; border-radius:8px; min-width:150px; }
+#currentTurn { position:fixed; top:20px; right:10px; font-weight:bold; font-size:18px; }
+#restartBtn { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); padding:10px 20px; font-size:16px; cursor:pointer; border:none; border-radius:6px; background:#ff9800; color:#000; font-weight:bold; }
 </style>
 </head>
 <body>
 
 <div id="players"></div>
 <div id="currentTurn"></div>
+<button id="restartBtn" style="display:none;">Restart</button>
 
 <h2 style="text-align:center; margin-top:20px;">Batak Hafıza Oyunu</h2>
 <div id="board"></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-  const socket = io();
-  const room = new URLSearchParams(location.search).get("room") || "masa1";
-  const name = prompt("İsminizi girin");
-  socket.emit("joinRoom", { room, name });
+const socket = io();
 
-  const board = document.getElementById("board");
-  const playersDiv = document.getElementById("players");
-  const currentTurnDiv = document.getElementById("currentTurn");
+// Masa ve şifre
+let room = prompt("Masa ismi?");
+let password = prompt("Şifre (isteğe bağlı)");
+let name = prompt("İsminizi girin");
 
-  socket.on("state", game => {
+socket.emit("joinRoom", { room, name, password });
 
-    // Oyuncuları göster
-    playersDiv.innerHTML = "<h3>Oyuncular</h3>";
-    game.players.forEach((p, i) => {
-      const score = game.scores[p.id] || 0;
-      const isTurn = game.turn === i;
-      const span = document.createElement("div");
-      span.textContent = `${p.name}: ${score}`;
-      if (isTurn) { span.style.fontWeight = "bold"; span.style.color = "#ff0"; }
-      playersDiv.appendChild(span);
-    });
+socket.on("passwordError", msg => alert(msg));
 
-    currentTurnDiv.textContent = game.players.length > 0 ? `Sıra: ${game.players[game.turn].name}` : "";
+const board = document.getElementById("board");
+const playersDiv = document.getElementById("players");
+const currentTurnDiv = document.getElementById("currentTurn");
+const restartBtn = document.getElementById("restartBtn");
 
-    // Kartları oluştur
-    board.innerHTML = "";
-    board.style.pointerEvents = "none";
-    game.deck.forEach((card, i) => {
-      const cardDiv = document.createElement("div");
-      cardDiv.className = "card";
-      const isOpen = game.open.includes(i);
-      const isMatched = game.matched.includes(i);
+restartBtn.onclick = () => socket.emit("restart", { room });
 
-      if (isOpen || isMatched) cardDiv.classList.add("open");
-      if (isMatched) cardDiv.classList.add("matched");
+socket.on("state", game => {
+  // Restart butonu host için görünür
+  restartBtn.style.display = game.host === socket.id ? "block" : "none";
 
-      const front = document.createElement("div");
-      front.className = "card-face card-front";
-      const imgFront = document.createElement("img");
-      imgFront.src = card.img;
-      front.appendChild(imgFront);
-
-      const back = document.createElement("div");
-      back.className = "card-face card-back";
-      const imgBack = document.createElement("img");
-      imgBack.src = "https://deckofcardsapi.com/static/img/back.png";
-      back.appendChild(imgBack);
-
-      cardDiv.appendChild(front);
-      cardDiv.appendChild(back);
-
-      // Sadece sıra kimdeyse tıklanabilir
-      if (!isMatched && game.players[game.turn].id === socket.id && !isOpen) {
-        cardDiv.style.cursor = "pointer";
-        cardDiv.onclick = () => socket.emit("cardClick", { room, index: i });
-      } else {
-        cardDiv.style.cursor = "default";
-        cardDiv.onclick = null;
-      }
-
-      board.appendChild(cardDiv);
-    });
-
-    setTimeout(() => { board.style.pointerEvents = "auto"; }, 700);
+  // Oyuncular
+  playersDiv.innerHTML = "<h3>Oyuncular</h3>";
+  game.players.forEach((p,i)=>{
+    const score = game.scores[p.id] || 0;
+    const isTurn = game.turn === i;
+    const div = document.createElement("div");
+    div.textContent = `${p.name}: ${score}`;
+    if(isTurn){ div.style.fontWeight="bold"; div.style.color="#ff0"; }
+    playersDiv.appendChild(div);
   });
+
+  currentTurnDiv.textContent = game.players.length>0 ? `Sıra: ${game.players[game.turn].name}` : "";
+
+  // Kartlar
+  board.innerHTML="";
+  board.style.pointerEvents="none";
+  game.deck.forEach((card,i)=>{
+    const cardDiv = document.createElement("div");
+    cardDiv.className="card";
+    const isOpen = game.open.includes(i);
+    const isMatched = game.matched.includes(i);
+
+    if(isOpen || isMatched) cardDiv.classList.add("open");
+    if(isMatched) cardDiv.classList.add("matched");
+
+    const front = document.createElement("div"); front.className="card-face card-front";
+    const imgFront = document.createElement("img"); imgFront.src = card.img; front.appendChild(imgFront);
+
+    const back = document.createElement("div"); back.className="card-face card-back";
+    const imgBack = document.createElement("img"); imgBack.src="https://deckofcardsapi.com/static/img/back.png"; back.appendChild(imgBack);
+
+    cardDiv.appendChild(front); cardDiv.appendChild(back);
+
+    if(!isMatched && game.players[game.turn].id===socket.id && !isOpen){
+      cardDiv.style.cursor="pointer";
+      cardDiv.onclick = ()=>socket.emit("cardClick",{room,index:i});
+    } else { cardDiv.style.cursor="default"; cardDiv.onclick=null; }
+
+    board.appendChild(cardDiv);
+  });
+
+  setTimeout(()=>{ board.style.pointerEvents="auto"; },700);
+});
 </script>
 
 </body>
